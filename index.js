@@ -19,7 +19,7 @@ module.exports = function asyncWait(onEmpty, ctx) {
 			--counter;
 
 			// run the callbacks
-			if (typeof cb === "function") cb.apply(ctx || this, arguments);
+			if (typeof cb === "function") cb.apply(this, arguments);
 			if (!counter && typeof onEmpty === "function") onEmpty.call(ctx);
 		}
 	};

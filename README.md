@@ -1,47 +1,89 @@
 # Async Wait
 
-This is small JavaScript utility that waits for many async operations to finish. This is very similar to something like `async.map` or `Promise.all`, but with a much looser API.
+This is a small JavaScript utility that waits for many async operations to finish. This is very similar to something like `async.map` or `Promise.all`, but with a looser API.
 
 ## Install
 
-Download the latest version from our [release page](https://github.com/BeneathTheInk/asyncwait/releases) and use via a script tag. The variable `asyncWait` will be attached to `window`.
+Download the latest version from our [release page](https://github.com/BeneathTheInk/asyncwait/releases) and use via a script tag.
 
 ```html
 <script type="text/javascript" src="asyncwait.js"></script>
 ```
 
-If using Browserify or Node.js, you can install via NPM and use via `require("asyncwait")`.
+```js
+asyncWait(function(){});
+```
+
+If using Browserify or Node.js, install with NPM.
 
 ```shell
 $ npm install asyncwait
 ```
 
-## Usage
-
-Call `asyncWait()` with an onEmpty callback. This function will be called when the wait queue is completely drained. This will return a wait function which can be wrapped around any async callback.
-
-```javascript
-var wait = asyncWait(function() {
-    console.log("done");
-});
-
-setTimeout(wait(function() {
-    console.log("my timeout");
-}), 100);
+```js
+var asyncWait = require("asyncwait");
 ```
 
-It also plays really nice with ES6 Promises:
+## Usage
+
+Call `asyncWait()` with an onEmpty callback. The callback will be called when all async operations being waited on have settled and completed. The returned method can be used to generate wait functions, which prevent the onEmpty callback from being called.
+
+Here is a really basic example.
 
 ```javascript
-var wait = asyncWait(function() {
+var generateWait = asyncWait(function() {
     console.log("done");
 });
 
-// called outside so it is registered immediately
-var done = wait();
+var waitFn = generateWait();
+setTimeout(waitFn, 100);
+setTimeout(waitFn, 500); // calling twice does nothing
+```
 
+It's mostly useful for waiting for many async operations to finish. The onEmpty callback is run immediately after the last wait function is executed.
+
+```javascript
+var generateWait = asyncWait(function() {
+    console.log("done");
+});
+
+myFirstAsyncThing(generateWait());
+mySecondAsyncThing(generateWait());
+myThirdAsyncThing(generateWait());
+```
+
+You can also pass a callback through the wait function. The callback is run prior to the onEmpty callback. This means you can generate and nest more wait functions within it.
+
+```javascript
+var generateWait = asyncWait(function() {
+    console.log("done");
+});
+
+// callback is run as if generateWait wasn't even there
+somethingAsync(generateWait(function(err) {
+    if (err) dealWithError(err);
+    
+    // onEmpty waits for this one too
+    myOtherAsyncThing(generateWait());
+}));
+```
+
+This style of async control flow is really flexible and plays nice with everything. Here's an example with ES6 Promises:
+
+```javascript
+var generateWait = asyncWait(function() {
+    console.log("done");
+});
+
+// we must add both a resolve and reject callback
+// so our onEmpty function is guaranteed to run
+// regardless of the outcome.
+var done = generateWait();
 myAsyncTask().then(function() {
     console.log("success");
     done();
-}, done);
+}, function(err) {
+    console.error(err);
+    done();
+});
 ```
